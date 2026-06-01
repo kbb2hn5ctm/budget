@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>月次収支メモ</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #181818;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #666;
+    --accent: #c8ff00;
+    --danger: #ff4d4d;
+    --warning: #ffaa00;
+    --safe: #c8ff00;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+
+  .header {
+    margin-bottom: 32px;
+  }
+
+  .header h1 {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .month-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .month-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 32px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .month-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .month-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── サマリーカード ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .summary-grid.wide {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  .card-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .card-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  .card-value.accent { color: var(--accent); }
+  .card-value.muted  { color: var(--muted); }
+
+  /* 残高カード（大） */
+  .balance-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 18px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .balance-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--bar-color, var(--safe));
+    transition: background 0.4s;
+  }
+
+  .balance-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .balance-amount {
+    font-family: 'DM Mono', monospace;
+    font-size: 40px;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin-bottom: 14px;
+    transition: color 0.4s;
+  }
+
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease, background 0.4s;
+  }
+
+  .progress-label {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── セクション ── */
+  .section {
+    margin-bottom: 20px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .section-total {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* 固定費リスト（表示のみ） */
+  .fixed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .fixed-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-radius: 6px;
+  }
+
+  .fixed-item-name {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .fixed-item-amount {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  /* 変動費入力 */
+  .expense-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: 10px;
+  }
+
+  .expense-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--surface);
+    border-radius: 6px;
+    animation: slideIn 0.2s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .expense-name {
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .expense-cat {
+    font-size: 10px;
+    color: var(--muted);
+    background: #222;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .expense-amt {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    text-align: right;
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+    line-height: 1;
+  }
+  .delete-btn:hover { color: var(--danger); }
+
+  /* 入力フォーム */
+  .add-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .form-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    padding: 9px 12px;
+    border-radius: 7px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+
+  .form-input:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--muted); }
+
+  select.form-input option {
+    background: var(--surface);
+  }
+
+  .add-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .add-btn:hover { opacity: 0.88; }
+  .add-btn:active { transform: scale(0.98); }
+
+  /* 設定モーダル */
+  .settings-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'Noto Sans JP', sans-serif;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .settings-btn:hover { border-color: var(--muted); color: var(--text); }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: flex-end;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 20px 16px 40px;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .modal-overlay.open .modal {
+    transform: translateY(0);
+  }
+
+  .modal-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .settings-field {
+    margin-bottom: 14px;
+  }
+
+  .settings-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .fixed-edit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .fixed-edit-row {
+    display: grid;
+    grid-template-columns: 1fr 100px auto;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .add-fixed-btn {
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'Noto Sans JP', sans-serif;
+    padding: 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.15s;
+    margin-bottom: 10px;
+  }
+  .add-fixed-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .save-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  .notice {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 24px;
+    line-height: 1.6;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Monthly Budget</h1>
+  <div class="month-selector">
+    <button class="month-btn" onclick="changeMonth(-1)">‹</button>
+    <div class="month-display" id="monthDisplay">2026年6月</div>
+    <button class="month-btn" onclick="changeMonth(1)">›</button>
+  </div>
+</div>
+
+<!-- 残高カード -->
+<div class="balance-card" id="balanceCard">
+  <div class="balance-label">使用可能残高</div>
+  <div class="balance-amount" id="balanceAmount">¥ —</div>
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+  <div class="progress-label">
+    <span id="progressLeft">変動費予算 ¥0</span>
+    <span id="progressUsed">使用 0%</span>
+  </div>
+</div>
+
+<!-- サマリー -->
+<div class="summary-grid">
+  <div class="card">
+    <div class="card-label">月収入目標</div>
+    <div class="card-value muted" id="totalBudget">¥ —</div>
+  </div>
+  <div class="card">
+    <div class="card-label">固定費合計</div>
+    <div class="card-value" id="fixedTotal">¥ —</div>
+  </div>
+  <div class="card">
+    <div class="card-label">変動費予算</div>
+    <div class="card-value accent" id="variableBudget">¥ —</div>
+  </div>
+  <div class="card">
+    <div class="card-label">今月の変動費</div>
+    <div class="card-value" id="variableUsed">¥ 0</div>
+  </div>
+</div>
+
+<!-- 固定費 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">🔒 固定費</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="section-total" id="fixedListTotal"></span>
+      <button class="settings-btn" onclick="openSettings()">編集</button>
+    </div>
+  </div>
+  <div class="fixed-list" id="fixedList"></div>
+</div>
+
+<!-- 変動費 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">💸 変動費</span>
+    <span class="section-total" id="variableListTotal"></span>
+  </div>
+  <div class="expense-list" id="expenseList"></div>
+
+  <div class="add-form">
+    <input class="form-input" id="expName" type="text" placeholder="内容（例：六本木ディナー）">
+    <div class="form-row">
+      <select class="form-input" id="expCat">
+        <option value="食費">🍽 食費</option>
+        <option value="交際費">🥂 交際費</option>
+        <option value="交通費">🚃 交通費</option>
+        <option value="娯楽">🎮 娯楽</option>
+        <option value="衣服">👔 衣服</option>
+        <option value="美容">💆 美容</option>
+        <option value="日用品">🛒 日用品</option>
+        <option value="その他">📦 その他</option>
+      </select>
+      <input class="form-input" id="expAmt" type="number" placeholder="金額（円）" min="0">
+    </div>
+    <button class="add-btn" onclick="addExpense()">＋ 追加</button>
+  </div>
+</div>
+
+<p class="notice">データはこのブラウザにのみ保存されます<br>Notionのページにこのツールのリンクを貼り付けてご利用ください</p>
+
+<!-- 設定モーダル -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-title">
+      <span>設定</span>
+      <button class="modal-close" onclick="closeSettings()">×</button>
+    </div>
+
+    <div class="settings-field">
+      <label class="settings-label">月収入目標（円）</label>
+      <input class="form-input" id="settingBudget" type="number" placeholder="例：200000">
+    </div>
+
+    <div class="settings-field">
+      <label class="settings-label">固定費一覧</label>
+      <div class="fixed-edit-list" id="fixedEditList"></div>
+      <button class="add-fixed-btn" onclick="addFixedRow()">＋ 固定費を追加</button>
+    </div>
+
+    <button class="save-btn" onclick="saveSettings()">保存する</button>
+  </div>
+</div>
+
+<script>
+// ── State ──
+const STORAGE_KEY = 'budget_v2';
+
+function loadData() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData();
+  } catch { return defaultData(); }
+}
+
+function defaultData() {
+  return {
+    totalBudget: 200000,
+    fixed: [
+      { name: '家賃', amount: 100000 },
+      { name: 'スマホ料金', amount: 8000 },
+      { name: '光熱費', amount: 12000 },
+    ],
+    expenses: {}  // { "2026-06": [{name, cat, amount}, ...] }
+  };
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+let state = loadData();
+let currentYear = 2026;
+let currentMonth = 6;
+
+// ── 月切替 ──
+function changeMonth(dir) {
+  currentMonth += dir;
+  if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+  if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
+  render();
+}
+
+function monthKey() {
+  return `${currentYear}-${String(currentMonth).padStart(2,'0')}`;
+}
+
+// ── レンダー ──
+function render() {
+  const key = monthKey();
+  const expenses = state.expenses[key] || [];
+
+  document.getElementById('monthDisplay').textContent =
+    `${currentYear}年${currentMonth}月`;
+
+  const fixedTotal = state.fixed.reduce((s, f) => s + f.amount, 0);
+  const variableBudget = state.totalBudget - fixedTotal;
+  const variableUsed = expenses.reduce((s, e) => s + e.amount, 0);
+  const balance = variableBudget - variableUsed;
+  const usedPct = variableBudget > 0 ? Math.min(variableUsed / variableBudget * 100, 100) : 0;
+
+  // カード値
+  document.getElementById('totalBudget').textContent = '¥ ' + fmt(state.totalBudget);
+  document.getElementById('fixedTotal').textContent = '¥ ' + fmt(fixedTotal);
+  document.getElementById('variableBudget').textContent = '¥ ' + fmt(variableBudget);
+  document.getElementById('variableUsed').textContent = '¥ ' + fmt(variableUsed);
+  document.getElementById('fixedListTotal').textContent = '¥ ' + fmt(fixedTotal);
+  document.getElementById('variableListTotal').textContent = '¥ ' + fmt(variableUsed);
+
+  // 残高カード
+  const balEl = document.getElementById('balanceAmount');
+  balEl.textContent = (balance < 0 ? '▲ ¥ ' : '¥ ') + fmt(Math.abs(balance));
+
+  const color = balance < 0 ? 'var(--danger)' : usedPct > 80 ? 'var(--warning)' : 'var(--safe)';
+  balEl.style.color = color;
+  document.getElementById('balanceCard').style.setProperty('--bar-color', color);
+
+  const fill = document.getElementById('progressFill');
+  fill.style.width = usedPct + '%';
+  fill.style.background = color;
+
+  document.getElementById('progressLeft').textContent = `変動費予算 ¥${fmt(variableBudget)}`;
+  document.getElementById('progressUsed').textContent = `使用 ${Math.round(usedPct)}%`;
+
+  // 固定費リスト
+  const fixedEl = document.getElementById('fixedList');
+  if (state.fixed.length === 0) {
+    fixedEl.innerHTML = '<div class="empty-state">固定費未設定 → 編集ボタンから追加</div>';
+  } else {
+    fixedEl.innerHTML = state.fixed.map(f => `
+      <div class="fixed-item">
+        <span class="fixed-item-name">${esc(f.name)}</span>
+        <span class="fixed-item-amount">¥ ${fmt(f.amount)}</span>
+      </div>
+    `).join('');
+  }
+
+  // 変動費リスト
+  const expEl = document.getElementById('expenseList');
+  if (expenses.length === 0) {
+    expEl.innerHTML = '<div class="empty-state">まだ入力なし</div>';
+  } else {
+    expEl.innerHTML = expenses.map((e, i) => `
+      <div class="expense-item">
+        <span class="expense-name">${esc(e.name)}</span>
+        <span class="expense-cat">${esc(e.cat)}</span>
+        <span class="expense-amt">¥ ${fmt(e.amount)}</span>
+        <button class="delete-btn" onclick="deleteExpense(${i})">×</button>
+      </div>
+    `).join('');
+  }
+}
+
+// ── 支出追加・削除 ──
+function addExpense() {
+  const name = document.getElementById('expName').value.trim();
+  const cat  = document.getElementById('expCat').value;
+  const amt  = parseInt(document.getElementById('expAmt').value);
+  if (!name || !amt || amt <= 0) return;
+
+  const key = monthKey();
+  if (!state.expenses[key]) state.expenses[key] = [];
+  state.expenses[key].push({ name, cat, amount: amt });
+  saveData();
+
+  document.getElementById('expName').value = '';
+  document.getElementById('expAmt').value = '';
+  render();
+}
+
+function deleteExpense(idx) {
+  const key = monthKey();
+  state.expenses[key].splice(idx, 1);
+  saveData();
+  render();
+}
+
+// ── 設定 ──
+function openSettings() {
+  document.getElementById('settingBudget').value = state.totalBudget;
+  renderFixedEditList();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeSettings();
+}
+
+function renderFixedEditList() {
+  const el = document.getElementById('fixedEditList');
+  el.innerHTML = state.fixed.map((f, i) => `
+    <div class="fixed-edit-row">
+      <input class="form-input" type="text" value="${esc(f.name)}"
+        onchange="state.fixed[${i}].name = this.value" placeholder="項目名">
+      <input class="form-input" type="number" value="${f.amount}"
+        onchange="state.fixed[${i}].amount = parseInt(this.value)||0" placeholder="金額">
+      <button class="delete-btn" onclick="removeFixed(${i})" style="color:#555;font-size:16px">×</button>
+    </div>
+  `).join('');
+}
+
+function addFixedRow() {
+  state.fixed.push({ name: '', amount: 0 });
+  renderFixedEditList();
+}
+
+function removeFixed(i) {
+  state.fixed.splice(i, 1);
+  renderFixedEditList();
+}
+
+function saveSettings() {
+  const budget = parseInt(document.getElementById('settingBudget').value);
+  if (budget > 0) state.totalBudget = budget;
+  saveData();
+  closeSettings();
+  render();
+}
+
+// ── ユーティリティ ──
+function fmt(n) {
+  return n.toLocaleString('ja-JP');
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Enterキーで追加
+document.getElementById('expAmt').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addExpense();
+});
+
+render();
+</script>
+</body>
+</html>
